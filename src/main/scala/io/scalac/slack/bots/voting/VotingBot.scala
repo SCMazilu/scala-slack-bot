@@ -111,22 +111,26 @@ object VotingBot extends MessageFormatter {
 
   def formatRichOpenMessage(sessionId: Long, user: String, parts: Array[String]): String = {
     val stringBuffer = new StringBuilder(128)
-    for (part <- parts.tail) {
-      stringBuffer.append(s":one: ${part.toString}\n")
+    for (i <- parts.tail.indices) {
+      stringBuffer.append(s"${toNumEmoji(i + 1)} ${parts.tail(i)}\n")
     }
-    return stringBuffer.toString()
+    stringBuffer.toString()
   }
 
-// function to return emoji based on numeric
-//  case 1
-//    return :one:
-//  case 2
-//    return :two:
-//  case 3
-//    return :three:
-//  case 4
-//    return :four:
-// up to 10
+  def toNumEmoji(i: Int): String = {
+    i match {
+      case 1 => ":one:"
+      case 2 => ":two:"
+      case 3 => ":three:"
+      case 4 => ":four:"
+      case 5 => ":five:"
+      case 6 => ":six:"
+      case 7 => ":seven:"
+      case 8 => ":eight:"
+      case 9 => ":nine:"
+      case 0 => ":zero:"
+    }
+  }
 
   def formatVoteMessage(sessionId: Long, user: String, answerId: Int): String =
     s"$user: Vote in $sessionId for $answerId has been taken"
