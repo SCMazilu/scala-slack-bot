@@ -2,7 +2,7 @@ package io.scalac.slack.bots.voting
 
 import io.scalac.slack.MessageEventBus
 import io.scalac.slack.bots.AbstractBot
-import io.scalac.slack.common.{BaseMessage, MessageFormatter, Command, OutboundMessage}
+import io.scalac.slack.common._
 import org.joda.time.DateTime
 
 /**
@@ -23,10 +23,23 @@ class VotingBot(repo: VotingRepo, override val bus: MessageEventBus) extends Abs
     case Command("vote-open", words, message) if words.length >= 1 =>
       val parts =  words.mkString(" ").split(";")
       val sessionId = repo.createSession(parts.head, parts.tail)
+      for (s <- parts.tail) {
+        log.info("part: " + s.toString)
+      }
 
       log.info(s"New session $sessionId started with ${parts.mkString(" ")}")
-      publish( OutboundMessage(message.channel,
-        formatOpenMessage(sessionId, message.user, parts)) )
+//      publish( RichOutboundMessage(message.channel,
+//        formatRichOpenMessage(sessionId, message.user, parts)) )
+      publish( RichOutboundMessage(message.channel,
+        List(Attachment(PreText("Click on a numbered emoji to make your choice:"),
+          Color(Color.good.value),
+          Title(parts.head),
+          Text(formatRichOpenMessage(sessionId, message.user, parts))
+        )))
+      )
+
+//      Field("Field 1", "vote :one:" + sessionId + " 0", short = true),
+//    Field("Field 2", "vote " + sessionId + " 1", short = true)
 
     case Command("vote", sessionIdStr :: answerIdStr :: _, message) =>
       log.info(s"${message.user} is voting on $answerIdStr in session $sessionIdStr")
@@ -60,12 +73,13 @@ class VotingBot(repo: VotingRepo, override val bus: MessageEventBus) extends Abs
             (s"$answerText VOTES #${votes.length} by $voters", votes.length)
           }.toList.sortBy(_._2).map(_._1)
           
-          OutboundMessage(message.channel, s"Closed session $sessionIdStr. Results $EOL" +
+          OutboundMessage(message.channel, s"Voting Session $sessionIdStr Closed. Results $EOL" +
             votingResults.mkString(EOL))
           
         case None =>
-          OutboundMessage(message.channel, s"No session with this Id: $sessionIdStr")
+          OutboundMessage(message.channel, s"No voting session with this Id: $sessionIdStr")
       }
+      log.info(s"Response: $response")
       publish(response)
   }
 }
@@ -75,10 +89,44 @@ object VotingBot extends MessageFormatter {
   case class Vote(voter: String, answer: Int)
   case class Session(topic: VotingTopic, votes: List[Vote])
 
+//  resolution = if json.fields.resolution and json.fields.resolution.name then " (_#{json.fields.resolution.name}_)" else ""
+//  color = if json.fields.issuetype and json.fields.issuetype.name == "Bug" then "danger" else "#003366"
+//  color = if json.fields.status and json.fields.status.name == "Resolved" then "good" else color
+//
+//  attachment =
+//    "fallback": "#{json.fields.priority.name} #{json.fields.issuetype.name} #{key} assigned to #{json.fields.assignee.name}",
+//  "text" : "`#{json.fields.priority.name}`  *#{json.fields.issuetype.name} is #{json.fields.status.name}*" + resolution + ", <" + jiraUrl + "/browse/#{key}|#{key}>, assignee #{json.fields.assignee.name}\n*Summary:* #{json.fields.summary}",
+//  "color": color,
+//  "mrkdwn_in": ["text"]
+//
+//  msg.robot.adapter.customMessage
+//  channel: msg.envelope.room
+//  username: msg.robot.name
+//  attachments: [attachment]
+
   def formatOpenMessage(sessionId: Long, user: String, parts: Array[String]): String = {
-    s"${mention(user)}: Voting session $sessionId started. Q: ${parts.head} $EOL" +
+    s"${mention(user)}: Voting session $sessionId started. *${parts.head} $EOL*" +
       s"A: ${parts.tail.mkString(EOL)}"
   }
+
+  def formatRichOpenMessage(sessionId: Long, user: String, parts: Array[String]): String = {
+    val stringBuffer = new StringBuilder(128)
+    for (part <- parts.tail) {
+      stringBuffer.append(s":one: ${part.toString}\n")
+    }
+    return stringBuffer.toString()
+  }
+
+// function to return emoji based on numeric
+//  case 1
+//    return :one:
+//  case 2
+//    return :two:
+//  case 3
+//    return :three:
+//  case 4
+//    return :four:
+// up to 10
 
   def formatVoteMessage(sessionId: Long, user: String, answerId: Int): String =
     s"$user: Vote in $sessionId for $answerId has been taken"
