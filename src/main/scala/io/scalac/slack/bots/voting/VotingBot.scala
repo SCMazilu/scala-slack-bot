@@ -28,18 +28,14 @@ class VotingBot(repo: VotingRepo, override val bus: MessageEventBus) extends Abs
       }
 
       log.info(s"New session $sessionId started with ${parts.mkString(" ")}")
-//      publish( RichOutboundMessage(message.channel,
-//        formatRichOpenMessage(sessionId, message.user, parts)) )
       publish( RichOutboundMessage(message.channel,
-        List(Attachment(PreText("Click on a numbered emoji to make your choice:"),
-          Color(Color.good.value),
+        List(Attachment(//PreText(parts.head),
+          Color(Color.darkBlue.value),
           Title(parts.head),
-          Text(formatRichOpenMessage(sessionId, message.user, parts))
+          Text(formatRichOpenMessage(sessionId, message.user, parts)),
+          Footer("Add a reaction to this message to make your choice.")
         )))
       )
-
-//      Field("Field 1", "vote :one:" + sessionId + " 0", short = true),
-//    Field("Field 2", "vote " + sessionId + " 1", short = true)
 
     case Command("vote", sessionIdStr :: answerIdStr :: _, message) =>
       log.info(s"${message.user} is voting on $answerIdStr in session $sessionIdStr")
@@ -70,11 +66,15 @@ class VotingBot(repo: VotingRepo, override val bus: MessageEventBus) extends Abs
           val votingResults = session.votes.groupBy(_.answer).map{ case (answerId, votes) =>
             val answerText = session.topic.answers(answerId)
             val voters = votes.foldLeft("")((acc, v) =>  acc + mention(v.voter))
-            (s"$answerText VOTES #${votes.length} by $voters", votes.length)
+            (s"$answerText had `${votes.length}` Votes. ($voters)", votes.length)
           }.toList.sortBy(_._2).map(_._1)
-          
-          OutboundMessage(message.channel, s"Voting Session $sessionIdStr Closed. Results $EOL" +
-            votingResults.mkString(EOL))
+
+          RichOutboundMessage(message.channel, List(Attachment(PreText(s"Voting Session $sessionIdStr Closed."),
+            Color(Color.good.value),
+            Title(s"Results for `${session.topic.question}`"),
+            Text(votingResults.mkString(EOL)),
+            Footer("Thanks for voting.")
+          )))
           
         case None =>
           OutboundMessage(message.channel, s"No voting session with this Id: $sessionIdStr")
@@ -88,21 +88,6 @@ object VotingBot extends MessageFormatter {
   case class VotingTopic(question: String, answers: Array[String], asked: DateTime, isOpened: Boolean = true)
   case class Vote(voter: String, answer: Int)
   case class Session(topic: VotingTopic, votes: List[Vote])
-
-//  resolution = if json.fields.resolution and json.fields.resolution.name then " (_#{json.fields.resolution.name}_)" else ""
-//  color = if json.fields.issuetype and json.fields.issuetype.name == "Bug" then "danger" else "#003366"
-//  color = if json.fields.status and json.fields.status.name == "Resolved" then "good" else color
-//
-//  attachment =
-//    "fallback": "#{json.fields.priority.name} #{json.fields.issuetype.name} #{key} assigned to #{json.fields.assignee.name}",
-//  "text" : "`#{json.fields.priority.name}`  *#{json.fields.issuetype.name} is #{json.fields.status.name}*" + resolution + ", <" + jiraUrl + "/browse/#{key}|#{key}>, assignee #{json.fields.assignee.name}\n*Summary:* #{json.fields.summary}",
-//  "color": color,
-//  "mrkdwn_in": ["text"]
-//
-//  msg.robot.adapter.customMessage
-//  channel: msg.envelope.room
-//  username: msg.robot.name
-//  attachments: [attachment]
 
   def formatOpenMessage(sessionId: Long, user: String, parts: Array[String]): String = {
     s"${mention(user)}: Voting session $sessionId started. *${parts.head} $EOL*" +
@@ -133,14 +118,14 @@ object VotingBot extends MessageFormatter {
   }
 
   def formatVoteMessage(sessionId: Long, user: String, answerId: Int): String =
-    s"$user: Vote in $sessionId for $answerId has been taken"
+    s"$user has voted in voting session $sessionId"
 
   def formatSessionClosedMessage(sessionId: Long, user: String): String =
-    s"$user: Session $sessionId has been closed"
+    s"$user: Voting session $sessionId has been closed"
 
   def formatNoAnswerMessage(sessionId: Long, user: String, answerId: Int): String =
-    s"$user: Session $sessionId has no answer $answerId"
+    s"$user: Voting session $sessionId has no answer #$answerId"
 
   def formatNoSessionMessage(sessionId: Long, user: String): String =
-    s"$user: No session with this Id: $sessionId"
+    s"$user: No voting session with this Id: $sessionId"
 }
