@@ -55,6 +55,24 @@ class VotingBot(repo: VotingRepo, override val bus: MessageEventBus) extends Abs
       }
       publish(response)
 
+    case Command("vote-anon", sessionIdStr :: answerIdStr :: _, message) =>
+      log.info(s"${message.user} is voting on $answerIdStr in session $sessionIdStr")
+      val answerId = answerIdStr.toInt
+      val sessionId = sessionIdStr.toLong
+
+      val vote = Vote(message.user, answerId)
+      val response = repo.addVote(sessionId, vote) match {
+        case VoteResult.Voted =>
+          OutboundMessage(message.channel, formatAnonVoteMessage(sessionId, message.user))
+        case VoteResult.NoAnswer =>
+          OutboundMessage(message.channel, formatNoAnswerMessage(sessionId, message.user, answerId))
+        case VoteResult.SessionClosed =>
+          OutboundMessage(message.channel, formatSessionClosedMessage(sessionId, message.user))
+        case VoteResult.NoSession =>
+          OutboundMessage(message.channel, formatNoSessionMessage(sessionId, message.user))
+      }
+      publish(response)
+
     case Command("vote-close", sessionIdStr :: _, message) =>
       log.info(s"Session $sessionIdStr is going to be closed")
       val sessionId = sessionIdStr.toLong
@@ -119,6 +137,9 @@ object VotingBot extends MessageFormatter {
 
   def formatVoteMessage(sessionId: Long, user: String, answerId: Int): String =
     s"$user has voted in voting session $sessionId"
+
+  def formatAnonVoteMessage(sessionId: Long, user: String): String =
+    s"$user: Vote in $sessionId has been taken"
 
   def formatSessionClosedMessage(sessionId: Long, user: String): String =
     s"$user: Voting session $sessionId has been closed"
